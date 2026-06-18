@@ -1,0 +1,9 @@
+Django==6.0.6
+django-cors-headers==4.9.0
+django-filter==25.2
+djangorestframework==3.17.1
+djangorestframework_simplejwt==5.5.1
+flask-cors==6.0.2
+pandocfilters==1.5.1
+PyJWT==2.13.0
+requests==2.34.2
