@@ -11,14 +11,17 @@ class AdImageSerializer(serializers.ModelSerializer):
 
 
 class AdListSerializer(serializers.ModelSerializer):
-    cover_image = serializers.SerializerMethodField()
-    category    = CategorySerializer(read_only=True)
-    seller_name = serializers.CharField(source='seller.username', read_only=True)
+    cover_image  = serializers.SerializerMethodField()
+    category     = CategorySerializer(read_only=True)
+    seller_name  = serializers.CharField(source='seller.username', read_only=True)
+    is_favourite = serializers.SerializerMethodField()
+    is_expired   = serializers.SerializerMethodField()
 
     class Meta:
         model  = Ad
         fields = ('id', 'title', 'price', 'location', 'category', 'seller_name',
-                  'cover_image', 'created_at', 'condition')
+                  'cover_image', 'created_at', 'condition', 'is_active',
+                  'expires_at', 'is_favourite', 'is_expired')
 
     def get_cover_image(self, obj):
         request = self.context.get('request')
@@ -27,16 +30,39 @@ class AdListSerializer(serializers.ModelSerializer):
             return request.build_absolute_uri(cover.image.url)
         return None
 
+    def get_is_favourite(self, obj):
+        request = self.context.get('request')
+        if not request or not request.user.is_authenticated:
+            return False
+        return obj.favourited_by.filter(user=request.user).exists()
+
+    def get_is_expired(self, obj):
+        from django.utils import timezone
+        return bool(obj.expires_at and timezone.now() > obj.expires_at)
+
 
 class AdDetailSerializer(serializers.ModelSerializer):
-    images   = AdImageSerializer(many=True, read_only=True)
-    category = CategorySerializer(read_only=True)
-    seller   = UserSerializer(read_only=True)
+    images       = AdImageSerializer(many=True, read_only=True)
+    category     = CategorySerializer(read_only=True)
+    seller       = UserSerializer(read_only=True)
+    is_favourite = serializers.SerializerMethodField()
+    is_expired   = serializers.SerializerMethodField()
 
     class Meta:
         model  = Ad
         fields = ('id', 'title', 'description', 'price', 'category', 'seller',
-                  'location', 'condition', 'images', 'created_at', 'updated_at', 'is_active')
+                  'location', 'condition', 'images', 'created_at', 'updated_at',
+                  'is_active', 'expires_at', 'is_favourite', 'is_expired')
+
+    def get_is_favourite(self, obj):
+        request = self.context.get('request')
+        if not request or not request.user.is_authenticated:
+            return False
+        return obj.favourited_by.filter(user=request.user).exists()
+
+    def get_is_expired(self, obj):
+        from django.utils import timezone
+        return bool(obj.expires_at and timezone.now() > obj.expires_at)
 
 
 class AdCreateUpdateSerializer(serializers.ModelSerializer):
