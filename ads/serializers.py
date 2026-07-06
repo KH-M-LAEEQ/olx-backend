@@ -1,7 +1,14 @@
 from rest_framework import serializers
-from .models import Ad, AdImage
+from .models import Ad, AdImage, Category
 from accounts.serializers import UserSerializer
-from categories.serializers import CategorySerializer
+
+
+class CategorySerializer(serializers.ModelSerializer):
+    ad_count = serializers.IntegerField(source='ads.count', read_only=True)
+
+    class Meta:
+        model  = Category
+        fields = ('id', 'name', 'slug', 'icon', 'ad_count')
 
 
 class AdImageSerializer(serializers.ModelSerializer):

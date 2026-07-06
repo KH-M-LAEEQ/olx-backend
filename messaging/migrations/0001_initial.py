@@ -10,7 +10,7 @@ class Migration(migrations.Migration):
     initial = True
 
     dependencies = [
-        ('ads', '0002_ad_expires_at_adreport_favourite'),
+        ('ads', '0001_initial'),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
 

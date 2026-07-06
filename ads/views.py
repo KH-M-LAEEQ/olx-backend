@@ -4,9 +4,16 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from django_filters.rest_framework import DjangoFilterBackend
 from django.shortcuts import get_object_or_404
-from .models import Ad, Favourite, AdReport
-from .serializers import AdListSerializer, AdDetailSerializer, AdCreateUpdateSerializer
+from .models import Ad, Favourite, AdReport, Category
+from .serializers import AdListSerializer, AdDetailSerializer, AdCreateUpdateSerializer, CategorySerializer
 from .filters import AdFilter
+
+
+class CategoryListView(generics.ListAPIView):
+    queryset           = Category.objects.all()
+    serializer_class   = CategorySerializer
+    permission_classes = [permissions.AllowAny]
+    pagination_class   = None
 
 
 class AdListView(generics.ListAPIView):

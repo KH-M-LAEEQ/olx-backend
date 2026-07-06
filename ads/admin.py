@@ -1,5 +1,11 @@
 from django.contrib import admin
-from .models import Ad, AdImage, Favourite, AdReport
+from .models import Ad, AdImage, Favourite, AdReport, Category
+
+
+@admin.register(Category)
+class CategoryAdmin(admin.ModelAdmin):
+    list_display  = ('name', 'slug', 'icon')
+    prepopulated_fields = {'slug': ('name',)}
 
 
 @admin.register(Ad)

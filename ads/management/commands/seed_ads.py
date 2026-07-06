@@ -4,8 +4,7 @@ from io import BytesIO
 from django.core.management.base import BaseCommand
 from django.core.files.base import ContentFile
 from django.contrib.auth import get_user_model
-from categories.models import Category
-from ads.models import Ad, AdImage
+from ads.models import Ad, AdImage, Category
 
 User = get_user_model()
 

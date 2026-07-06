@@ -7,3 +7,5 @@ flask-cors==6.0.2
 pandocfilters==1.5.1
 PyJWT==2.13.0
 requests==2.34.2
+channels==4.2.0
+daphne==4.1.2

@@ -14,6 +14,7 @@ DEBUG = os.environ.get('DEBUG', 'False') == 'True'
 ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
 
 INSTALLED_APPS = [
+    'daphne',  # must be first to override runserver with ASGI
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -27,11 +28,11 @@ INSTALLED_APPS = [
     'rest_framework_simplejwt.token_blacklist',
     'corsheaders',
     'django_filters',
+    'channels',
 
     # Our apps
     'accounts',
     'ads',
-    'categories',
     'messaging',
 ]
 
@@ -65,6 +66,13 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = 'config.wsgi.application'
+ASGI_APPLICATION  = 'config.asgi.application'
+
+CHANNEL_LAYERS = {
+    'default': {
+        'BACKEND': 'channels.layers.InMemoryChannelLayer',
+    }
+}
 
 DATABASES = {
     'default': {
