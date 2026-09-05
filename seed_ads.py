@@ -1,166 +1,195 @@
+import json
 import os
-import io
-import django
-import requests
+import urllib.error
+import urllib.parse
+import urllib.request
 
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')
-django.setup()
-
+from django.core.management.base import BaseCommand
 from django.core.files.base import ContentFile
-from accounts.models import User
-from categories.models import Category
-from ads.models import Ad, AdImage
+from django.contrib.auth import get_user_model
+from ads.models import Ad, AdImage, Category
 
-PEXELS_KEY = 'IRod3n1KsMFCb57g0um9OVhIXreezqDHl2UhZV7qe3tQPtRZOIivDzaK'
+User = get_user_model()
 
-SEED_ADS = [
+PEXELS_URL = 'https://api.pexels.com/v1/search'
+
+CATEGORIES = [
+    {'name': 'Mobiles',     'slug': 'mobiles',     'icon': '📱'},
+    {'name': 'Cars',        'slug': 'cars',        'icon': '🚗'},
+    {'name': 'Property',    'slug': 'property',    'icon': '🏠'},
+    {'name': 'Electronics', 'slug': 'electronics', 'icon': '💻'},
+    {'name': 'Jobs',        'slug': 'jobs',        'icon': '💼'},
+    {'name': 'Furniture',   'slug': 'furniture',   'icon': '🛋️'},
+    {'name': 'Fashion',     'slug': 'fashion',     'icon': '👗'},
+    {'name': 'Books',       'slug': 'books',       'icon': '📚'},
+    {'name': 'Sports',      'slug': 'sports',      'icon': '⚽'},
+    {'name': 'Animals',     'slug': 'animals',     'icon': '🐾'},
+]
+
+# 'query' is the Pexels search term. 'pick' chooses which result to use
+# (0-based) so two ads sharing a query don't end up with the same photo.
+ADS = [
     # Mobiles
-    {'title': 'iPhone 14 Pro Max – 256GB Space Black', 'category': 'mobiles', 'price': 280000, 'location': 'Karachi', 'condition': 'used',
-     'description': 'Slightly used iPhone 14 Pro Max in excellent condition. No scratches, original box included. Battery health 91%.', 'query': 'iPhone smartphone'},
-    {'title': 'Samsung Galaxy S23 Ultra', 'category': 'mobiles', 'price': 220000, 'location': 'Lahore', 'condition': 'used',
-     'description': 'Samsung Galaxy S23 Ultra 12GB/256GB. All accessories included. Face and fingerprint unlock working perfectly.', 'query': 'Samsung Galaxy phone'},
-    {'title': 'OnePlus 11 5G – Brand New Sealed', 'category': 'mobiles', 'price': 95000, 'location': 'Islamabad', 'condition': 'new',
-     'description': 'OnePlus 11 5G sealed box. 16GB RAM, 256GB storage. Snapdragon 8 Gen 2 processor.', 'query': 'OnePlus Android phone'},
+    {'title': 'Samsung Galaxy S24 Ultra – 256GB, Phantom Black', 'price': 295000, 'location': 'Karachi', 'condition': 'new', 'category': 'mobiles', 'desc': 'Brand new sealed box. 200MP camera, S Pen included. Genuine Samsung warranty 1 year.', 'img_seed': 'phone1', 'query': 'samsung smartphone black', 'pick': 0},
+    {'title': 'iPhone 15 Pro Max – 512GB, Natural Titanium', 'price': 420000, 'location': 'Lahore', 'condition': 'new', 'category': 'mobiles', 'desc': 'PTA approved. Box packed. Apple Store receipt available. No scratches, immaculate condition.', 'img_seed': 'phone2', 'query': 'iphone', 'pick': 0},
+    {'title': 'Oppo Reno 11 Pro – 12GB RAM, 256GB', 'price': 85000, 'location': 'Islamabad', 'condition': 'used', 'category': 'mobiles', 'desc': 'Only 3 months used, comes with original charger and box. Minor wear on back glass.', 'img_seed': 'phone3', 'query': 'smartphone in hand', 'pick': 1},
+    {'title': 'Xiaomi 14 – Leica Camera, 8GB/256GB', 'price': 115000, 'location': 'Rawalpindi', 'condition': 'new', 'category': 'mobiles', 'desc': 'Global version, dual SIM, 90W fast charging. Still sealed.', 'img_seed': 'phone4', 'query': 'mobile phone camera', 'pick': 2},
 
     # Cars
-    {'title': 'Toyota Corolla 2020 – 1.8 Altis', 'category': 'cars', 'price': 5200000, 'location': 'Karachi', 'condition': 'used',
-     'description': 'Well maintained Toyota Corolla Altis 1.8. First owner. 45,000 km driven. All genuine parts.', 'query': 'Toyota Corolla car'},
-    {'title': 'Honda Civic 2019 – Turbo 1.5', 'category': 'cars', 'price': 4800000, 'location': 'Lahore', 'condition': 'used',
-     'description': 'Honda Civic Turbo 1.5L 2019. Immaculate condition, no accident history. New tyres fitted.', 'query': 'Honda Civic car'},
-    {'title': 'Suzuki Alto VXL 2022 – Automatic', 'category': 'cars', 'price': 2100000, 'location': 'Rawalpindi', 'condition': 'used',
-     'description': 'Suzuki Alto VXL 2022 automatic transmission. Fuel efficient, low mileage 18,000 km only.', 'query': 'Suzuki small car'},
-
-    # Bikes
-    {'title': 'Honda CB125F 2023 – Like New', 'category': 'bikes', 'price': 195000, 'location': 'Faisalabad', 'condition': 'used',
-     'description': 'Honda CB125F 2023 model, self-start, alloy wheels. Only 5,000 km driven. All documents clear.', 'query': 'Honda motorcycle bike'},
-    {'title': 'Yamaha YBR 125G 2022', 'category': 'bikes', 'price': 155000, 'location': 'Multan', 'condition': 'used',
-     'description': 'Yamaha YBR 125G with genuine parts. Good condition, no major repairs. Registration in Multan.', 'query': 'Yamaha motorcycle'},
+    {'title': 'Toyota Corolla Altis 1.8 2022 – Pearl White', 'price': 6800000, 'location': 'Karachi', 'condition': 'used', 'category': 'cars', 'desc': '42,000 km only. Original paint. All docs clear. Recently serviced at Toyota dealership.', 'img_seed': 'car1', 'query': 'white sedan car', 'pick': 0},
+    {'title': 'Honda Civic RS Turbo 2023 – Lunar Silver', 'price': 8200000, 'location': 'Lahore', 'condition': 'used', 'category': 'cars', 'desc': '12,000 km driven. Sunroof, leather seats, all power accessories. Single owner.', 'img_seed': 'car2', 'query': 'silver sedan car', 'pick': 1},
+    {'title': 'Suzuki Alto VXR 2021 – Solid White', 'price': 2750000, 'location': 'Multan', 'condition': 'used', 'category': 'cars', 'desc': 'Family-used, no accident, all original. 55,000 km. Registration Multan. Serious buyers only.', 'img_seed': 'car3', 'query': 'small hatchback car', 'pick': 0},
+    {'title': 'Toyota Hilux Revo 2022 – Diesel Double Cab', 'price': 12500000, 'location': 'Peshawar', 'condition': 'used', 'category': 'cars', 'desc': 'Excellent condition, full option, genuine 4x4. 80,000 km. Price negotiable.', 'img_seed': 'car4', 'query': 'pickup truck', 'pick': 0},
 
     # Property
-    {'title': '3-Bed Apartment for Sale – DHA Phase 5 Karachi', 'category': 'property', 'price': 22000000, 'location': 'Karachi', 'condition': 'used',
-     'description': '1,800 sq ft 3-bedroom, 2-bathroom apartment on 8th floor. Sea facing, covered parking, 24/7 security.', 'query': 'modern apartment building'},
-    {'title': '5-Marla House for Sale – Bahria Town Lahore', 'category': 'property', 'price': 18500000, 'location': 'Lahore', 'condition': 'used',
-     'description': 'Fully furnished 5-marla house in Bahria Town. 4 bedrooms, 3 bathrooms, servant quarter. Owner built.', 'query': 'residential house property'},
+    {'title': '5 Marla House for Sale – DHA Phase 6, Lahore', 'price': 28500000, 'location': 'Lahore', 'condition': 'used', 'category': 'property', 'desc': '3 bed, 2 bath, lounge, TV lounge, servant quarter. Gas + electricity. Near park.', 'img_seed': 'house1', 'query': 'modern house exterior', 'pick': 0},
+    {'title': '2 Bed Flat for Rent – Gulshan-e-Iqbal, Karachi', 'price': 65000, 'location': 'Karachi', 'condition': 'used', 'category': 'property', 'desc': 'Ground floor, independent entrance, 24hr security. All utilities available. Ready to move.', 'img_seed': 'house2', 'query': 'apartment living room', 'pick': 0},
+    {'title': '10 Marla Plot – Bahria Town Phase 8, Rawalpindi', 'price': 18000000, 'location': 'Rawalpindi', 'condition': 'new', 'category': 'property', 'desc': 'Corner plot, facing park. All dues clear. Ideal for construction. Transfer ready.', 'img_seed': 'house3', 'query': 'empty land plot', 'pick': 0},
 
     # Electronics
-    {'title': 'Dell XPS 15 Laptop – Core i7 12th Gen', 'category': 'electronics', 'price': 185000, 'location': 'Karachi', 'condition': 'used',
-     'description': 'Dell XPS 15 with 16GB DDR5 RAM, 512GB NVMe SSD, NVIDIA RTX 3050. Perfect for professionals.', 'query': 'Dell laptop computer'},
-    {'title': 'Sony 55-inch 4K OLED Smart TV', 'category': 'electronics', 'price': 145000, 'location': 'Lahore', 'condition': 'used',
-     'description': 'Sony Bravia 55-inch 4K OLED Smart TV. Android TV with Google Assistant. Remote and box included.', 'query': 'Sony smart television TV'},
-    {'title': 'Canon EOS R6 Mark II – Body Only', 'category': 'electronics', 'price': 420000, 'location': 'Islamabad', 'condition': 'used',
-     'description': 'Canon EOS R6 Mark II mirrorless camera. Only 3,000 actuations. Comes with original strap and charger.', 'query': 'Canon camera photography'},
-
-    # Fashion
-    {'title': 'Nike Air Jordan 1 Retro High – Size 42', 'category': 'fashion', 'price': 22000, 'location': 'Karachi', 'condition': 'new',
-     'description': 'Brand new Nike Air Jordan 1 Retro High OG Chicago. Size UK 8 / EU 42. Original box included.', 'query': 'Nike sneakers shoes'},
-    {'title': 'Levi\'s 501 Original Jeans – 3 Pairs', 'category': 'fashion', 'price': 9500, 'location': 'Lahore', 'condition': 'new',
-     'description': 'Levi\'s 501 original fit jeans, sizes 30x32. Genuine import. Pack of 3 different shades.', 'query': 'jeans denim fashion'},
-
-    # Furniture
-    {'title': '7-Seater L-Shaped Sofa – Dark Grey', 'category': 'furniture', 'price': 65000, 'location': 'Karachi', 'condition': 'used',
-     'description': 'L-shaped 7-seater sofa in dark grey fabric. Excellent condition, no stains. Self-pickup only.', 'query': 'sofa couch furniture living room'},
-    {'title': 'King Size Wooden Bed with Mattress', 'category': 'furniture', 'price': 48000, 'location': 'Lahore', 'condition': 'used',
-     'description': 'Solid wood king size bed frame with Moltyfoam mattress. 2 years old, no damage.', 'query': 'wooden bed bedroom furniture'},
-    {'title': 'Office Workstation – 6-Seat Setup', 'category': 'furniture', 'price': 75000, 'location': 'Islamabad', 'condition': 'used',
-     'description': 'Complete 6-seat office workstation setup with dividers and cable management. Moving sale.', 'query': 'office desk workstation furniture'},
-
-    # Animals
-    {'title': 'Golden Retriever Puppies – 6 Weeks Old', 'category': 'animals', 'price': 35000, 'location': 'Lahore', 'condition': 'new',
-     'description': 'Pure breed Golden Retriever puppies. Both parents on site. Vaccinated and dewormed. Ready in 2 weeks.', 'query': 'Golden Retriever puppy dog'},
-    {'title': 'Persian Cat – 1 Year Old Female', 'category': 'animals', 'price': 18000, 'location': 'Karachi', 'condition': 'used',
-     'description': 'Beautiful white Persian cat, 1 year old, fully vaccinated. Very friendly and litter trained.', 'query': 'Persian cat white fluffy'},
-
-    # Services
-    {'title': 'Professional Home Painting – Interior & Exterior', 'category': 'services', 'price': 15000, 'location': 'Karachi', 'condition': 'new',
-     'description': 'Expert painting team. Per room pricing starts from PKR 3,500. Free estimation visit. 10 years experience.', 'query': 'house painting home renovation'},
-    {'title': 'Web Development – React & Django Projects', 'category': 'services', 'price': 50000, 'location': 'Islamabad', 'condition': 'new',
-     'description': 'Full-stack developer offering React + Django web apps, REST APIs, and e-commerce solutions. Portfolio available.', 'query': 'web developer coding computer'},
+    {'title': 'Dell XPS 15 Laptop – Core i9, RTX 4060, 32GB', 'price': 380000, 'location': 'Islamabad', 'condition': 'used', 'category': 'electronics', 'desc': '6 months old, perfect for video editing / gaming. Comes with original bag and charger.', 'img_seed': 'laptop1', 'query': 'laptop computer', 'pick': 0},
+    {'title': 'Samsung 55" QLED 4K Smart TV – QN55Q80C', 'price': 185000, 'location': 'Lahore', 'condition': 'new', 'category': 'electronics', 'desc': 'Box packed, purchased 2 weeks ago. Dolby Atmos, HDMI 2.1. Moving abroad, must sell.', 'img_seed': 'tv1', 'query': 'flat screen television', 'pick': 0},
+    {'title': 'Sony PlayStation 5 – Disc Edition + 2 Controllers', 'price': 145000, 'location': 'Karachi', 'condition': 'used', 'category': 'electronics', 'desc': 'Excellent condition, used lightly. Includes 4 games. Original box available.', 'img_seed': 'console1', 'query': 'game console controller', 'pick': 0},
 
     # Jobs
-    {'title': 'Hiring – Senior React Developer (Remote)', 'category': 'jobs', 'price': 150000, 'location': 'Karachi', 'condition': 'new',
-     'description': 'Startup hiring senior React developer. 3+ years experience required. Monthly salary PKR 150,000–200,000. Remote work.', 'query': 'office job hiring work'},
-    {'title': 'Sales Executive Needed – Electronics Store', 'category': 'jobs', 'price': 45000, 'location': 'Lahore', 'condition': 'new',
-     'description': 'Electronics retail store needs experienced sales executive. Salary + commission. Apply with CV.', 'query': 'sales executive job interview'},
+    {'title': 'Female Receptionist Needed – IT Company Karachi', 'price': 55000, 'location': 'Karachi', 'condition': 'new', 'category': 'jobs', 'desc': 'Min 2 years experience, good communication. Mon–Fri 9–6. Salary 45k–55k depending on experience.', 'img_seed': 'office1', 'query': 'office reception desk', 'pick': 0},
+    {'title': 'Experienced Cook Required – DHA Lahore Household', 'price': 35000, 'location': 'Lahore', 'condition': 'new', 'category': 'jobs', 'desc': 'Must know Pakistani, Chinese and continental cuisine. Live-in or live-out. References required.', 'img_seed': 'office2', 'query': 'chef cooking kitchen', 'pick': 0},
+
+    # Furniture
+    {'title': 'L-Shape Sofa Set – 7 Seater, Dark Grey Velvet', 'price': 85000, 'location': 'Karachi', 'condition': 'used', 'category': 'furniture', 'desc': 'Bought 1 year ago, very lightly used. No stains, original cushions. Self-transport required.', 'img_seed': 'sofa1', 'query': 'grey sofa couch', 'pick': 0},
+    {'title': 'King Size Wooden Bed + Mattress + Side Tables', 'price': 55000, 'location': 'Lahore', 'condition': 'used', 'category': 'furniture', 'desc': 'Solid sheesham wood, excellent condition. Mattress orthopedic. Relocating, sell ASAP.', 'img_seed': 'bed1', 'query': 'wooden bed bedroom', 'pick': 0},
+
+    # Fashion
+    {'title': "Men's Leather Jacket – XL, Genuine Cowhide", 'price': 18000, 'location': 'Karachi', 'condition': 'new', 'category': 'fashion', 'desc': 'Brand new, never worn. Premium quality, zip pockets. Size XL (fits 40-42 chest).', 'img_seed': 'jacket1', 'query': 'leather jacket', 'pick': 0},
+    {'title': 'Nike Air Jordan 1 Retro High – US9, Chicago', 'price': 35000, 'location': 'Lahore', 'condition': 'new', 'category': 'fashion', 'desc': 'Authentic pair, bought from US. DS (deadstock) condition. Box included.', 'img_seed': 'shoes1', 'query': 'sneakers shoes', 'pick': 0},
 ]
 
 
-def fetch_pexels_image(query):
-    url = 'https://api.pexels.com/v1/search'
-    headers = {'Authorization': PEXELS_KEY}
-    params = {'query': query, 'per_page': 1, 'orientation': 'landscape'}
-    try:
-        r = requests.get(url, headers=headers, params=params, timeout=10)
-        r.raise_for_status()
-        photos = r.json().get('photos', [])
-        if photos:
-            img_url = photos[0]['src']['large']
-            img_r = requests.get(img_url, timeout=15)
-            img_r.raise_for_status()
-            return img_r.content, f"{query.replace(' ', '_')}.jpg"
-    except Exception as e:
-        print(f'  Pexels error for "{query}": {e}')
-    return None, None
+class Command(BaseCommand):
+    help = 'Seed the database with demo ads and matching Pexels photos'
 
-
-def main():
-    # Ensure categories exist
-    print('Seeding categories...')
-    os.system('python seed_categories.py 2>&1')
-
-    # Create or get demo seller
-    seller, created = User.objects.get_or_create(
-        username='demo_seller',
-        defaults={
-            'email': 'demo@olx.pk',
-            'first_name': 'Demo',
-            'last_name': 'Seller',
-            'phone': '03001234567',
-            'city': 'Karachi',
-        }
-    )
-    if created:
-        seller.set_password('demo1234')
-        seller.save()
-        print('Created demo_seller user (password: demo1234)')
-    else:
-        print('Using existing demo_seller user')
-
-    categories = {c.slug: c for c in Category.objects.all()}
-    created_count = 0
-
-    for ad_data in SEED_ADS:
-        cat = categories.get(ad_data['category'])
-        if not cat:
-            print(f'  Skipping — category "{ad_data["category"]}" not found')
-            continue
-
-        if Ad.objects.filter(title=ad_data['title'], seller=seller).exists():
-            print(f'  Exists: {ad_data["title"]}')
-            continue
-
-        print(f'  Creating: {ad_data["title"]}')
-        ad = Ad.objects.create(
-            title=ad_data['title'],
-            description=ad_data['description'],
-            price=ad_data['price'],
-            category=cat,
-            seller=seller,
-            location=ad_data['location'],
-            condition=ad_data['condition'],
+    def add_arguments(self, parser):
+        parser.add_argument(
+            '--force', action='store_true',
+            help='Delete existing demo ads and re-create them with fresh images.',
         )
 
-        img_bytes, filename = fetch_pexels_image(ad_data['query'])
-        if img_bytes:
-            ad_image = AdImage(ad=ad, is_cover=True)
-            ad_image.image.save(filename, ContentFile(img_bytes), save=True)
-            print(f'    + image saved')
-        else:
-            print(f'    ! no image')
+    def handle(self, *args, **options):
+        api_key = os.environ.get('PEXELS_API_KEY')
+        if not api_key:
+            self.stderr.write(self.style.ERROR(
+                'PEXELS_API_KEY is not set. Add it in Render > Environment.'
+            ))
+            return
 
-        created_count += 1
+        self.api_key = api_key
+        self._photo_cache = {}
 
-    print(f'\nDone. {created_count} ads created.')
+        self.stdout.write('Creating categories...')
+        cat_map = {}
+        for c in CATEGORIES:
+            obj, _ = Category.objects.get_or_create(
+                slug=c['slug'],
+                defaults={'name': c['name'], 'icon': c['icon']},
+            )
+            cat_map[c['slug']] = obj
 
+        self.stdout.write('Creating demo seller...')
+        seller, created = User.objects.get_or_create(
+            username='demo_seller',
+            defaults={'email': 'demo@olx.pk', 'phone': '03001234567', 'city': 'Karachi'},
+        )
+        if created:
+            seller.set_password('demo1234')
+            seller.save()
 
-if __name__ == '__main__':
-    main()
+        if options['force']:
+            deleted, _ = Ad.objects.filter(seller=seller).delete()
+            self.stdout.write(f'Deleted {deleted} existing demo objects.')
+
+        self.stdout.write(f'Seeding {len(ADS)} ads with Pexels images...')
+        created_count = 0
+
+        for ad_data in ADS:
+            if Ad.objects.filter(title=ad_data['title']).exists():
+                self.stdout.write(f'  skip (exists): {ad_data["title"][:50]}')
+                continue
+
+            ad = Ad.objects.create(
+                title=ad_data['title'],
+                description=ad_data['desc'],
+                price=ad_data['price'],
+                category=cat_map.get(ad_data['category']),
+                seller=seller,
+                location=ad_data['location'],
+                condition=ad_data['condition'],
+            )
+
+            photo_url = self._photo_for(ad_data['query'], ad_data.get('pick', 0))
+            if photo_url:
+                try:
+                    img_data = self._download(photo_url)
+                    ad_image = AdImage(ad=ad, is_cover=True)
+                    ad_image.image.save(
+                        f"{ad_data['img_seed']}.jpg",
+                        ContentFile(img_data),
+                        save=True,
+                    )
+                    self.stdout.write(f'  OK: {ad_data["title"][:55]}')
+                except Exception as e:
+                    self.stdout.write(
+                        f'  WARN: image failed ({e}) for {ad_data["title"][:40]}'
+                    )
+            else:
+                self.stdout.write(
+                    f'  WARN: no photo for "{ad_data["query"]}" — {ad_data["title"][:40]}'
+                )
+
+            created_count += 1
+
+        self.stdout.write(self.style.SUCCESS(f'\nDone! Created {created_count} ads.'))
+
+    # ── helpers ─────────────────────────────────────────────────────────────
+
+    def _photo_for(self, query, pick):
+        """Return one image URL for a search term, caching results per query."""
+        if query not in self._photo_cache:
+            self._photo_cache[query] = self._search(query)
+
+        urls = self._photo_cache[query]
+        if not urls:
+            return None
+        return urls[pick % len(urls)]
+
+    def _search(self, query):
+        params = urllib.parse.urlencode({
+            'query': query,
+            'per_page': 5,
+            'orientation': 'landscape',
+        })
+        request = urllib.request.Request(
+            f'{PEXELS_URL}?{params}',
+            headers={'Authorization': self.api_key},
+        )
+        try:
+            with urllib.request.urlopen(request, timeout=20) as response:
+                payload = json.loads(response.read().decode('utf-8'))
+        except urllib.error.HTTPError as e:
+            self.stderr.write(self.style.ERROR(
+                f'Pexels returned {e.code} for "{query}" — check the API key.'
+            ))
+            return []
+        except Exception as e:
+            self.stderr.write(self.style.WARNING(f'Pexels request failed: {e}'))
+            return []
+
+        return [
+            p['src']['large']
+            for p in payload.get('photos', [])
+            if p.get('src', {}).get('large')
+        ]
+
+    def _download(self, url):
+        req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            return resp.read()
