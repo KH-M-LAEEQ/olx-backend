@@ -1,6 +1,6 @@
-# OLX Backend
+# Bazaario Backend
 
-Django REST Framework backend for the OLX Clone project.
+Django REST Framework backend for the Bazaario project.
 
 ## Branches
 - `main` — stable releases

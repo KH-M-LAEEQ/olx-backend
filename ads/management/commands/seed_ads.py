@@ -105,7 +105,7 @@ class Command(BaseCommand):
         self.stdout.write('Creating demo seller...')
         seller, created = User.objects.get_or_create(
             username='demo_seller',
-            defaults={'email': 'demo@olx.pk', 'phone': '03001234567', 'city': 'Karachi'},
+            defaults={'email': 'demo@bazaario.app', 'phone': '03001234567', 'city': 'Karachi'},
         )
         if created:
             seller.set_password('demo1234')

@@ -26,14 +26,14 @@ class AuthRateThrottle(AnonRateThrottle):
 def _send_otp_email(user, otp):
     if not user.email:
         return
-    subject = 'Your OLX Email Verification Code'
+    subject = 'Your Bazaario Email Verification Code'
     body = (
         f'Hi {user.username},\n\n'
-        f'Your OLX email verification code is:\n\n'
+        f'Your Bazaario email verification code is:\n\n'
         f'    {otp}\n\n'
         f'This code expires in {OTP_EXPIRY_HOURS} hours.\n\n'
-        f'If you did not create an OLX account, ignore this email.\n\n'
-        f'— The OLX Team'
+        f'If you did not create a Bazaario account, ignore this email.\n\n'
+        f'— The Bazaario Team'
     )
     try:
         send_mail(subject, body, django_settings.DEFAULT_FROM_EMAIL, [user.email], fail_silently=False)
@@ -44,14 +44,14 @@ def _send_otp_email(user, otp):
 def _send_reset_otp_email(user, otp):
     if not user.email:
         return
-    subject = 'Your OLX Password Reset Code'
+    subject = 'Your Bazaario Password Reset Code'
     body = (
         f'Hi {user.username},\n\n'
-        f'Your OLX password reset code is:\n\n'
+        f'Your Bazaario password reset code is:\n\n'
         f'    {otp}\n\n'
         f'This code expires in {OTP_EXPIRY_HOURS} hours.\n\n'
         f'If you did not request a password reset, ignore this email.\n\n'
-        f'— The OLX Team'
+        f'— The Bazaario Team'
     )
     try:
         send_mail(subject, body, django_settings.DEFAULT_FROM_EMAIL, [user.email], fail_silently=False)

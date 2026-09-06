@@ -4,6 +4,10 @@ from django.conf import settings
 from django.views.static import serve
 from ads.views import CategoryListView
 
+admin.site.site_header = 'Bazaario Administration'
+admin.site.site_title = 'Bazaario Admin'
+admin.site.index_title = 'Bazaario Administration'
+
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/auth/',       include('accounts.urls')),
