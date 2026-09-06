@@ -14,7 +14,7 @@ except ImportError:
 
 SECRET_KEY = os.environ.get('SECRET_KEY', 'dev-only-insecure-key-change-me')
 
-DEBUG = os.environ.get('DEBUG', 'False') == 'True'
+DEBUG = os.environ.get('DEBUG', 'False').strip().lower() == 'true'
 
 ALLOWED_HOSTS = [
     h.strip() for h in
@@ -183,6 +183,8 @@ CORS_ALLOW_CREDENTIALS = True
 # ── Behind Render's proxy ───────────────────────────────────────────────────
 if not DEBUG:
     SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+    USE_X_FORWARDED_HOST = True
+    SECURE_SSL_REDIRECT = True
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
 
